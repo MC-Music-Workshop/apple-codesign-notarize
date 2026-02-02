@@ -1,0 +1,104 @@
+name: 'Apple Codesign & Notarize'
+description: 'Sign and notarize macOS packages with Apple Developer certificates'
+author: 'MC Music Workshop'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  # Certificate secrets (base64-encoded .p12)
+  application-certificate:
+    description: 'Base64-encoded Developer ID Application certificate (.p12) for signing apps/bundles'
+    required: false
+  application-certificate-password:
+    description: 'Password for the application certificate'
+    required: false
+  installer-certificate:
+    description: 'Base64-encoded Developer ID Installer certificate (.p12) for signing .pkg files'
+    required: true
+  installer-certificate-password:
+    description: 'Password for the installer certificate'
+    required: true
+
+  # Notarization credentials
+  apple-id:
+    description: 'Apple ID email for notarization'
+    required: false
+  apple-app-password:
+    description: 'App-specific password for notarization'
+    required: false
+  team-id:
+    description: 'Apple Developer Team ID (e.g., 9WNXKEF4SM)'
+    required: false
+
+  # What to sign
+  sign-bundles:
+    description: 'Newline or space-separated paths to bundles to sign with codesign (.app, .vst3, .component, etc.)'
+    required: false
+  package-path:
+    description: 'Path to the .pkg file to sign with productsign'
+    required: true
+  signed-package-path:
+    description: 'Output path for signed package. If omitted, replaces the original.'
+    required: false
+
+  # Options
+  notarize:
+    description: 'Whether to submit for notarization. Values: true, false, auto (default: auto = notarize if credentials provided)'
+    required: false
+    default: 'auto'
+  codesign-options:
+    description: 'Options for codesign --options flag (default: runtime)'
+    required: false
+    default: 'runtime'
+  codesign-deep:
+    description: 'Use --deep flag for codesign (default: false)'
+    required: false
+    default: 'false'
+
+outputs:
+  signed:
+    description: 'Whether the package was signed successfully (true/false)'
+    value: ${{ steps.sign.outputs.signed }}
+  notarized:
+    description: 'Whether the package was notarized successfully (true/false)'
+    value: ${{ steps.sign.outputs.notarized }}
+  stapled:
+    description: 'Whether the notarization ticket was stapled (true/false)'
+    value: ${{ steps.sign.outputs.stapled }}
+  can-sign-app:
+    description: 'Whether application signing certificate was available'
+    value: ${{ steps.sign.outputs.can_sign_app }}
+  can-sign-pkg:
+    description: 'Whether installer signing certificate was available'
+    value: ${{ steps.sign.outputs.can_sign_pkg }}
+  can-notarize:
+    description: 'Whether notarization credentials were available'
+    value: ${{ steps.sign.outputs.can_notarize }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Sign and Notarize
+      id: sign
+      shell: bash
+      env:
+        INPUT_APPLICATION_CERTIFICATE: ${{ inputs.application-certificate }}
+        INPUT_APPLICATION_CERTIFICATE_PASSWORD: ${{ inputs.application-certificate-password }}
+        INPUT_INSTALLER_CERTIFICATE: ${{ inputs.installer-certificate }}
+        INPUT_INSTALLER_CERTIFICATE_PASSWORD: ${{ inputs.installer-certificate-password }}
+        INPUT_APPLE_ID: ${{ inputs.apple-id }}
+        INPUT_APPLE_APP_PASSWORD: ${{ inputs.apple-app-password }}
+        INPUT_TEAM_ID: ${{ inputs.team-id }}
+        INPUT_SIGN_BUNDLES: ${{ inputs.sign-bundles }}
+        INPUT_PACKAGE_PATH: ${{ inputs.package-path }}
+        INPUT_SIGNED_PACKAGE_PATH: ${{ inputs.signed-package-path }}
+        INPUT_NOTARIZE: ${{ inputs.notarize }}
+        INPUT_CODESIGN_OPTIONS: ${{ inputs.codesign-options }}
+        INPUT_CODESIGN_DEEP: ${{ inputs.codesign-deep }}
+      run: ${{ github.action_path }}/sign.sh
+
+    - name: Cleanup Keychain
+      if: always()
+      shell: bash
+      run: ${{ github.action_path }}/cleanup.sh
